@@ -15,19 +15,31 @@ impl Vec2 {
         vec2(r * theta.cos(), r * theta.sin())
     }
 
+    pub fn mag_squared(&self) -> f64 {
+        self.x.powi(2) + self.y.powi(2)
+    }
+
     pub fn mag(&self) -> f64 {
-        (self.x.powi(2) + self.y.powi(2)).sqrt()
+        self.mag_squared().sqrt()
+    }
+
+    pub fn norm(&self) -> Self {
+        *self / self.mag()
     }
 
     pub fn angle(&self) -> f64 {
         self.y.atan2(self.x)
     }
 
-    pub fn dot(&self, rhs: &Vec2) -> Vec2 {
-        vec2(self.x * rhs.x, self.y * rhs.y)
+    pub fn dot(&self, rhs: Vec2) -> f64 {
+        self.x * rhs.x + self.y * rhs.y
     }
 
     //cross
+
+    pub fn dist(&self, other: Vec2) -> f64 {
+        (*self - other).mag()
+    }
 }
 
 impl Add for Vec2 {

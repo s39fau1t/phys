@@ -31,21 +31,15 @@ async fn main() {
     /*
     let mut points = [
         Point {
-            mass: 5.0,
+            mass: 15.0,
             pos: Vec2 { x: screen_width() as f64 / 4.0 , y: screen_height() as f64 / 2.0 },
-            vel: Vec2 { x: 50.0, y: -50.0 },
+            vel: Vec2 { x: 100.0, y: 0.0 },
             force: Vec2 { x: 0.0, y: 0.0 }
         },
         Point {
-            mass: 5.0,
+            mass: 15.0,
             pos: Vec2 { x: screen_width() as f64 / 4.0 * 3.0 , y: screen_height() as f64 / 2.0 },
-            vel: Vec2 { x: -50.0, y: 50.0 },
-            force: Vec2 { x: 0.0, y: 0.0 }
-        },
-        Point {
-            mass: 20.0,
-            pos: Vec2 { x: screen_width() as f64 / 2.0 , y: screen_height() as f64 / 2.0 },
-            vel: Vec2 { x: 0.0, y: 0.0 },
+            vel: Vec2 { x: -100.0, y: 0.0 },
             force: Vec2 { x: 0.0, y: 0.0 }
         }
     ];
@@ -55,45 +49,58 @@ async fn main() {
 
     for _ in 0..100 {
         points.push(Point {
-            mass: gen_range(5.0, 25.0),
+            mass: gen_range(1.0, 25.0),
             pos: vec2(gen_range(0.0, screen_width() as f64), gen_range(0.0, screen_height() as f64)),
             vel: vec2(gen_range(-200.0, 200.0), gen_range(-200.0, 200.0)),
             force: vec2(0.0, 0.0)
-        })
+        });
     }
 
     loop {
+        let dt = get_frame_time() as f64 / 5.0;
+
         clear_background(WHITE);
+
+        for point in &mut points {
+            point.step(dt);
+        }
 
         for i in 0..points.len() {
             let (point, others) = points[i..].split_first_mut().unwrap();
 
             for other in others {
-                let dist = ((point.pos.x - other.pos.x).powi(2) + (point.pos.y - other.pos.y).powi(2)).sqrt();
-                let force = point.mass * other.mass * dist / 1000.0;
-                //let force = point.mass * other.mass / dist.powi(2) * 50000.0;
+                //collision (todo: sat)
+                //right now radius is based on mass
+                if point.pos.dist(other.pos) < point.mass + other.mass {
+                    //assume constant velocity
+                    //TODO: factor in acceleration a*t^2
+                    //solve the quadratic dist(p1 - v1*t, p2 - v2*t)=r1+r2
+                    let a = point.vel.mag_squared() + other.vel.mag_squared() + point.vel.dot(other.vel);
+                    let b = 2.0 * (point.vel - other.vel).dot(other.pos - point.pos);
+                    let c = (point.pos - other.pos).mag_squared() - (point.mass + other.mass).powi(2);
 
-                point.apply_force(Vec2::from_polar(force, (other.pos.y - point.pos.y).atan2(other.pos.x - point.pos.x)));
-                other.apply_force(Vec2::from_polar(force, (point.pos.y - other.pos.y).atan2(point.pos.x - other.pos.x)));
+                    let t = (-b + (b.powi(2) - 4.0 * a * c).sqrt()) / (2.0 * a);
+
+                    //resolve collsion
+                    point.pos -= point.vel * t;
+                    other.pos -= other.vel * t;
+
+                    //use conservation of momentum to find new velocities (assume perfectly elastic)
+                    //direction of impulse
+                    let n = (point.pos - other.pos).norm();
+                    //magnitude of impulse
+                    let j = (((point.vel - other.vel) * 2.0 * point.mass * other.mass) / (point.mass + other.mass)).mag();
+
+                    point.vel += n * j / point.mass;
+                    other.vel -= n * j / other.mass;
+
+                    point.pos += point.vel * t;
+                    other.pos += other.vel * t;
+                }
             }
         }
 
-        for point in &mut points {
-            if is_mouse_button_down(MouseButton::Left) {
-                let (mouse_x, mouse_y) = mouse_position();
-
-                point.apply_force(Vec2::from_polar(1000.0 * point.mass, (mouse_y as f64 - point.pos.y).atan2(mouse_x as f64 - point.pos.x)));
-            }
-
-            let contain = vec2(
-                screen_width() as f64 - point.pos.x * 2.0,
-                screen_height() as f64 - point.pos.y * 2.0
-            );
-
-            point.apply_force(Vec2::from_polar(contain.mag().powi(2) / 500.0, contain.angle()));
-
-            point.step(get_frame_time() as f64);
-
+        for point in &points {
             draw_circle(point.pos.x as f32, point.pos.y as f32, point.mass as f32, BLACK);
         }
 
