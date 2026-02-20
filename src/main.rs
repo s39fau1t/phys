@@ -1,5 +1,7 @@
 mod vec;
 
+use std::cmp::Ordering;
+
 use macroquad::{color::colors::*, input::*, rand::*, shapes::*, time::*, window::*};
 
 use vec::{Vec2, vec2};
@@ -26,7 +28,7 @@ impl Point {
     }
 }
 
-#[macroquad::main("MyGame")]
+#[macroquad::main("Sim")]
 async fn main() {
     /*
     let mut points = [
@@ -47,7 +49,7 @@ async fn main() {
 
     let mut points = Vec::new();
 
-    for _ in 0..100 {
+    for _ in 0..150 {
         points.push(Point {
             mass: gen_range(1.0, 25.0),
             pos: vec2(gen_range(0.0, screen_width() as f64), gen_range(0.0, screen_height() as f64)),
@@ -57,12 +59,64 @@ async fn main() {
     }
 
     loop {
-        let dt = get_frame_time() as f64 / 5.0;
+        let dt = get_frame_time() as f64;
 
         clear_background(WHITE);
 
         for point in &mut points {
+            if is_mouse_button_down(MouseButton::Left) {
+                let (mouse_x, mouse_y) = mouse_position();
+
+                point.apply_force(Vec2::from_polar(1000.0 * point.mass, (mouse_y as f64 - point.pos.y).atan2(mouse_x as f64 - point.pos.x)));
+            }
+/*
+            point.apply_force(point.vel * -0.5 * point.mass);
+
+            let contain = vec2(
+                screen_width() as f64 - point.pos.x * 2.0,
+                screen_height() as f64 - point.pos.y * 2.0
+            );
+
+            point.apply_force(Vec2::from_polar(contain.mag().powi(2) / 500.0, contain.angle()));
+*/
             point.step(dt);
+
+            //collision with wall
+            let coll_xl = point.pos.x - point.mass < 0.0;
+            let coll_yt = point.pos.y - point.mass < 0.0;
+
+            let coll_xr = point.pos.x + point.mass > screen_width() as f64;
+            let coll_yb = point.pos.y + point.mass > screen_height() as f64;
+
+            let t_x = if coll_xl { point.pos.x - point.mass } else { point.pos.x - screen_width() as f64 + point.mass } / point.vel.x;
+            let t_y = if coll_yt { point.pos.y - point.mass } else { point.pos.y - screen_height() as f64 + point.mass } / point.vel.y;
+
+            let coll_x = coll_xl || coll_xr;
+            let coll_y = coll_yt || coll_yb;
+
+            let (refl_x, refl_y, t) = match (coll_x, coll_y) {
+                (true, true) => {
+                    match t_x.total_cmp(&t_y) {
+                        Ordering::Less => (false, true, t_y),
+                        Ordering::Greater => (true, false, t_x),
+                        Ordering::Equal => (true, true, t_x)
+                    }
+                }
+                (true, false) => (true, false, t_x),
+                (false, true) => (false, true, t_y),
+                (false, false) => (false, false, 0.0)
+            };
+
+            point.pos -= point.vel * t;
+
+            if refl_x {
+                point.vel.x *= -1.0;
+            }
+            if refl_y {
+                point.vel.y *= -1.0;
+            }
+
+            point.pos += point.vel * t;
         }
 
         for i in 0..points.len() {
@@ -89,7 +143,7 @@ async fn main() {
                     //direction of impulse
                     let n = (point.pos - other.pos).norm();
                     //magnitude of impulse
-                    let j = (((point.vel - other.vel) * 2.0 * point.mass * other.mass) / (point.mass + other.mass)).mag();
+                    let j = ((other.vel - point.vel).dot(n) * 2.0 * point.mass * other.mass) / (point.mass + other.mass);
 
                     point.vel += n * j / point.mass;
                     other.vel -= n * j / other.mass;
@@ -99,7 +153,7 @@ async fn main() {
                 }
             }
         }
-
+    
         for point in &points {
             draw_circle(point.pos.x as f32, point.pos.y as f32, point.mass as f32, BLACK);
         }
