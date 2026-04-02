@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Vec2 {
     pub x: f64,
-    pub y: f64
+    pub y: f64,
 }
 
 impl Vec2 {
@@ -31,13 +31,15 @@ impl Vec2 {
         self.y.atan2(self.x)
     }
 
-    pub fn dot(&self, rhs: Vec2) -> f64 {
+    pub fn dot(&self, rhs: Self) -> f64 {
         self.x * rhs.x + self.y * rhs.y
     }
 
-    //cross
+    pub fn cross(&self, rhs: Self) -> f64 {
+        self.x * rhs.y - self.y * rhs.x
+    }
 
-    pub fn dist(&self, other: Vec2) -> f64 {
+    pub fn dist(&self, other: Self) -> f64 {
         (*self - other).mag()
     }
 }
@@ -91,7 +93,7 @@ impl Div<f64> for Vec2 {
     type Output = Self;
 
     fn div(self, rhs: f64) -> Self {
-        vec2(self.x / rhs, self.y / rhs)   
+        vec2(self.x / rhs, self.y / rhs)
     }
 }
 
